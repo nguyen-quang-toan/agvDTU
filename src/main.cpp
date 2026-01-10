@@ -53,7 +53,7 @@ void cylinderControl(const std_msgs::Int16MultiArray& msg) {
   if (msg.data_length >= 2) {
     cmd_pair1 = msg.data[0]; 
     cmd_pair2 = msg.data[1]; 
-  }
+  }                                                 
 }
 ros::Subscriber<std_msgs::Int16MultiArray> sub_cylinder("cylinderControl", &cylinderControl);
 
