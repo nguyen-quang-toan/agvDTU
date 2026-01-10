@@ -1,3 +1,7 @@
+// rostopic echo /sonarSensor
+// rostopic pub /ledControl std_msgs/Int16MultiArray "{data: [1, 1, 1, 1]}" --once
+// rostopic pub /cylinderControl std_msgs/Int16MultiArray "{data: [2, 2]}" --once 
+// data [door1, door2]: 0 - close, 1 - open, 2 - stop
 #include <ros.h>
 #include <std_msgs/Int16MultiArray.h>
 #include <NewPing.h>
