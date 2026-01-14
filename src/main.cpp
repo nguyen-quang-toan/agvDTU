@@ -3,16 +3,18 @@
 // rostopic pub /cylinderControl std_msgs/Int16MultiArray "{data: [2, 2]}" --once 
 // data [door1, door2]: 0 - close, 1 - open, 2 - stop
 #include <ros.h>
-#include <std_msgs/Int16MultiArray.h>
+#include <std_msgs/Int16MultiArray.h> 
 #include <NewPing.h>
 #include "BKD_Spio.h"
 #include "BKD_Motor.h"
 
 Spio SpioInstance(40, 41, 38, 39);
 Motor cylinder0(Motor::type::H_STD, 30, 7, 0.0, false);
-Motor cylinder1(Motor::type::H_STD, 32, 8, 0.0, false);
+Motor cylinder1(Motor::type::H_STD, 32, 8, 0.0, false);     
 Motor cylinder2(Motor::type::H_STD, 36, 10, 0.0, false);
 Motor cylinder3(Motor::type::H_STD, 34, 9, 0.0, false);
+uint8_t satateLed1 = 0;
+uint8_t satateLed2 = 0;
 
 #define TRIGGER_PIN_1  31 
 #define ECHO_PIN_1     33 
@@ -64,48 +66,48 @@ ros::Subscriber<std_msgs::Int16MultiArray> sub_cylinder("cylinderControl", &cyli
 void handleCylinders() {
   if (cmd_pair1 == 1) { 
     // MỞ
-    cylinder0.setPower(-1.0);
-    cylinder1.setPower(-1.0);
-    SpioInstance.writeBit(0, 0); 
+    cylinder0.setPower(-0.5);
+    cylinder1.setPower(-0.5);
+    SpioInstance.writeBit(7, 0); 
   } 
   else if (cmd_pair1 == 0) { 
     // ĐÓNG
     if (SpioInstance.readBit(SpioInstance.bufferInput, 0)) {
-      cylinder0.setPower(1.0);
+      cylinder0.setPower(0.5);
     } else if (!SpioInstance.readBit(SpioInstance.bufferInput, 0)) {
       cylinder0.setPower(0.0);
     }
 
     if (SpioInstance.readBit(SpioInstance.bufferInput, 1)) {
-      cylinder1.setPower(1.0);
+      cylinder1.setPower(0.5);
     } else if (!SpioInstance.readBit(SpioInstance.bufferInput, 1)) {
       cylinder1.setPower(0.0); 
     }
-    SpioInstance.writeBit(0, 1);
+    SpioInstance.writeBit(7, 1);
   } 
   else if (cmd_pair1 == 2) { 
     // DỪNG
     cylinder0.setPower(0.0);
     cylinder1.setPower(0.0);
-    SpioInstance.writeBit(0, 0);
+    SpioInstance.writeBit(7, 1);
   }
 
   if (cmd_pair2 == 1) { 
     // MỞ
-    cylinder2.setPower(-1.0);
-    cylinder3.setPower(-1.0);
+    cylinder2.setPower(-0.5);
+    cylinder3.setPower(-0.5);
     SpioInstance.writeBit(5, 0);
   } 
   else if (cmd_pair2 == 0) { 
     // ĐÓNG
     if (SpioInstance.readBit(SpioInstance.bufferInput, 3)) {
-      cylinder3.setPower(1.0);
+      cylinder3.setPower(0.5);
     } else if (!SpioInstance.readBit(SpioInstance.bufferInput, 3)) {
       cylinder3.setPower(0.0);
     }
 
     if (SpioInstance.readBit(SpioInstance.bufferInput, 2)) {
-      cylinder2.setPower(1.0);
+      cylinder2.setPower(0.5);
     } else if (!SpioInstance.readBit(SpioInstance.bufferInput, 2)) {
       cylinder2.setPower(0.0);
     }
