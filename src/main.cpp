@@ -1,20 +1,23 @@
-// rostopic echo /sonarSensor
-// rostopic pub /ledControl std_msgs/Int16MultiArray "{data: [1, 1, 1, 1]}" --once
-// rostopic pub /cylinderControl std_msgs/Int16MultiArray "{data: [2, 2]}" --once 
-// data [door1, door2]: 0 - close, 1 - open, 2 - stop
 #include <ros.h>
 #include <std_msgs/Int16MultiArray.h> 
 #include <NewPing.h>
 #include "BKD_Spio.h"
 #include "BKD_Motor.h"
 
+unsigned long timeLimit1 = 1500;
+unsigned long timeLimit2 = 1500;
+
+unsigned long startTime1 = 0;
+unsigned long startTime2 = 0;
+
+int last_cmd1 = 2; 
+int last_cmd2 = 2;
+
 Spio SpioInstance(40, 41, 38, 39);
 Motor cylinder0(Motor::type::H_STD, 30, 7, 0.0, false);
 Motor cylinder1(Motor::type::H_STD, 32, 8, 0.0, false);     
 Motor cylinder2(Motor::type::H_STD, 36, 10, 0.0, false);
 Motor cylinder3(Motor::type::H_STD, 34, 9, 0.0, false);
-uint8_t satateLed1 = 0;
-uint8_t satateLed2 = 0;
 
 #define TRIGGER_PIN_1  31 
 #define ECHO_PIN_1     33 
@@ -41,7 +44,6 @@ int cmd_pair1 = 2;
 int cmd_pair2 = 2; 
 
 ros::NodeHandle nh;
-
 std_msgs::Int16MultiArray sonar_msg;
 ros::Publisher pub_sonar("sonarSensor", &sonar_msg);
 int16_t range_values[SONAR_NUM];
@@ -59,62 +61,68 @@ void cylinderControl(const std_msgs::Int16MultiArray& msg) {
   if (msg.data_length >= 2) {
     cmd_pair1 = msg.data[0]; 
     cmd_pair2 = msg.data[1]; 
+
+    if (cmd_pair1 == 0 && last_cmd1 != 0) startTime1 = millis();
+    if (cmd_pair2 == 0 && last_cmd2 != 0) startTime2 = millis();
+
+    last_cmd1 = cmd_pair1;
+    last_cmd2 = cmd_pair2;
   }                                                 
 }
 ros::Subscriber<std_msgs::Int16MultiArray> sub_cylinder("cylinderControl", &cylinderControl);
 
 void handleCylinders() {
-  if (cmd_pair1 == 1) { 
-    // MỞ
+  unsigned long now = millis();
+
+  if (cmd_pair1 == 1) { // Open
     cylinder0.setPower(-0.5);
     cylinder1.setPower(-0.5);
     SpioInstance.writeBit(7, 0); 
   } 
-  else if (cmd_pair1 == 0) { 
-    // ĐÓNG
-    if (SpioInstance.readBit(SpioInstance.bufferInput, 0)) {
+  else if (cmd_pair1 == 0) { // Close
+    bool isTimeout1 = (now - startTime1 >= timeLimit1);
+
+    if (SpioInstance.readBit(SpioInstance.bufferInput, 0) && !isTimeout1) {
       cylinder0.setPower(0.5);
-    } else if (!SpioInstance.readBit(SpioInstance.bufferInput, 0)) {
+    } else if (!SpioInstance.readBit(SpioInstance.bufferInput, 0) || isTimeout1){
       cylinder0.setPower(0.0);
     }
 
-    if (SpioInstance.readBit(SpioInstance.bufferInput, 1)) {
+    if (SpioInstance.readBit(SpioInstance.bufferInput, 1) && !isTimeout1) {
       cylinder1.setPower(0.5);
-    } else if (!SpioInstance.readBit(SpioInstance.bufferInput, 1)) {
+    } else if (!SpioInstance.readBit(SpioInstance.bufferInput, 1) || isTimeout1) {
       cylinder1.setPower(0.0); 
     }
     SpioInstance.writeBit(7, 1);
   } 
-  else if (cmd_pair1 == 2) { 
-    // DỪNG
+  else { // Stop
     cylinder0.setPower(0.0);
     cylinder1.setPower(0.0);
-    SpioInstance.writeBit(7, 1);
+    SpioInstance.writeBit(7, 0);
   }
 
-  if (cmd_pair2 == 1) { 
-    // MỞ
+  if (cmd_pair2 == 1) { // Open
     cylinder2.setPower(-0.5);
     cylinder3.setPower(-0.5);
     SpioInstance.writeBit(5, 0);
   } 
-  else if (cmd_pair2 == 0) { 
-    // ĐÓNG
-    if (SpioInstance.readBit(SpioInstance.bufferInput, 3)) {
+  else if (cmd_pair2 == 0) { // Close
+    bool isTimeout2 = (now - startTime2 >= timeLimit2);
+
+    if (SpioInstance.readBit(SpioInstance.bufferInput, 3) && !isTimeout2) {
       cylinder3.setPower(0.5);
-    } else if (!SpioInstance.readBit(SpioInstance.bufferInput, 3)) {
+    } else if (!SpioInstance.readBit(SpioInstance.bufferInput, 3) || isTimeout2) {
       cylinder3.setPower(0.0);
     }
 
-    if (SpioInstance.readBit(SpioInstance.bufferInput, 2)) {
+    if (SpioInstance.readBit(SpioInstance.bufferInput, 2) && !isTimeout2) {
       cylinder2.setPower(0.5);
-    } else if (!SpioInstance.readBit(SpioInstance.bufferInput, 2)) {
+    } else if (!SpioInstance.readBit(SpioInstance.bufferInput, 2) || isTimeout2) {
       cylinder2.setPower(0.0);
     }
     SpioInstance.writeBit(5, 1);
   } 
-  else if (cmd_pair2 == 2) {
-    // DỪNG
+  else { // Stop
     cylinder2.setPower(0.0);
     cylinder3.setPower(0.0);
     SpioInstance.writeBit(5, 0);
@@ -123,7 +131,6 @@ void handleCylinders() {
 
 void setup() {
   SpioInstance.init();
-  
   nh.initNode();
   nh.advertise(pub_sonar);
   nh.subscribe(sub_led);
@@ -135,7 +142,8 @@ void setup() {
 
 void loop() {
   SpioInstance.onLoop();
-  handleCylinders();
+  handleCylinders();     
+
   for (int i = 0; i < SONAR_NUM; i++) {
     range_values[i] = (int16_t)sonars[i].ping_cm();
   }
