@@ -5,9 +5,9 @@
 #include "BKD_Spio.h"
 #include "BKD_Motor.h"
 #include <Wire.h>
-#include <Adafruit_INA219.h>
+#include <Adafruit_INA228.h>
 
-Adafruit_INA219 ina219;
+Adafruit_INA228 ina228;
 unsigned long lastBatteryTime = 0;
 const unsigned long batteryInterval = 2000;
 
@@ -49,7 +49,7 @@ const uint16_t LED_BIT_MAPPING[LED_NUM] = {1, 2, 3, 4};
 
 std_msgs::Float32MultiArray battery_msg;
 ros::Publisher pub_battery("batterySensor", &battery_msg);
-float battery_data[2]; // [0]: Voltage, [1]: Percent
+float battery_data[2];
 
 int cmd_pair1 = 2; 
 int cmd_pair2 = 2; 
@@ -150,7 +150,7 @@ void handleBattery() {
   if (currentMillis - lastBatteryTime >= batteryInterval) {
     lastBatteryTime = currentMillis;
 
-    float busVoltage = ina219.getBusVoltage_V();
+    float busVoltage = ina228.getBusVoltage_V();
   
     float batteryPercent = mapFloat(busVoltage, 20.0, 29.2, 0, 100); 
 
@@ -163,6 +163,7 @@ void handleBattery() {
     pub_battery.publish(&battery_msg);
   }
 }  
+
 void setup() {
   SpioInstance.init();
   
@@ -178,7 +179,7 @@ void setup() {
   battery_msg.data_length = 2;
   battery_msg.data = battery_data;
 
-  if (!ina219.begin()) {
+  if (!ina228.begin()) {
 
   }
 }

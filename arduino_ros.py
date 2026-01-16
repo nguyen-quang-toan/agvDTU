@@ -141,7 +141,7 @@
 
 #!/usr/bin/env python3
 import rospy
-from std_msgs.msg import Int16MultiArray
+from std_msgs.msg import Int16MultiArray, Float32MultiArray
 import sys
 
 class RobotMonitor:
@@ -151,11 +151,13 @@ class RobotMonitor:
         self.sonar_data = [0, 0, 0, 0]
         self.door_states = [2, 2]
         self.led_states = [1, 1, 1, 1]
+        self.battery_data = [0.0, 0.0]
 
         # Subscribe to relevant topics
         rospy.Subscriber('sonarSensor', Int16MultiArray, self.sonar_cb)
         rospy.Subscriber('cylinderControl', Int16MultiArray, self.cyl_status_cb)
         rospy.Subscriber('ledControl', Int16MultiArray, self.led_status_cb)
+        rospy.Subscriber('batterySensor', Float32MultiArray, self.battery_cb)
 
         print("--- MONITOR NODE ACTIVE ---")
 
@@ -167,7 +169,9 @@ class RobotMonitor:
 
     def led_status_cb(self, msg):
         self.led_states = msg.data
-
+        
+    def battery_cb(self, msg):
+        self.battery_data = msg.data
 if __name__ == '__main__':
     robot = RobotMonitor()
     rate = rospy.Rate(10) 
@@ -176,12 +180,18 @@ if __name__ == '__main__':
         while not rospy.is_shutdown():
             led_display = ["ON" if x == 0 else "OFF" for x in robot.led_states]
             
+            voltage = robot.battery_data[0]
+            percent = robot.battery_data[1]
+            
             # Print the monitored data
             sys.stdout.write(
-                f"\r[MONITOR] Sonar: {list(robot.sonar_data)} | "
+                f"\r[MONITOR] "
+                f"Batt: {voltage:.2f}V ({percent:.1f}%) | "
+                f"Sonar: {list(robot.sonar_data)} | "
                 f"Doors: {list(robot.door_states)} | "
                 f"LEDs: {led_display}   "
             )
+            
             sys.stdout.flush()
             rate.sleep()
     except Exception as e:
