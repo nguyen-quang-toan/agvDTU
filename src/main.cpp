@@ -1,8 +1,15 @@
 #include <ros.h>
 #include <std_msgs/Int16MultiArray.h> 
+#include <std_msgs/Float32MultiArray.h>
 #include <NewPing.h>
 #include "BKD_Spio.h"
 #include "BKD_Motor.h"
+#include <Wire.h>
+#include <Adafruit_INA219.h>
+
+Adafruit_INA219 ina219;
+unsigned long lastBatteryTime = 0;
+const unsigned long batteryInterval = 2000;
 
 unsigned long timeLimit1 = 1500;
 unsigned long timeLimit2 = 1500;
@@ -40,13 +47,22 @@ NewPing sonars[SONAR_NUM] = {
 #define LED_NUM 4
 const uint16_t LED_BIT_MAPPING[LED_NUM] = {1, 2, 3, 4}; 
 
+std_msgs::Float32MultiArray battery_msg;
+ros::Publisher pub_battery("batterySensor", &battery_msg);
+float battery_data[2]; // [0]: Voltage, [1]: Percent
+
 int cmd_pair1 = 2; 
 int cmd_pair2 = 2; 
+
+float mapFloat(float x, float in_min, float in_max, float out_min, float out_max) {
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
 
 ros::NodeHandle nh;
 std_msgs::Int16MultiArray sonar_msg;
 ros::Publisher pub_sonar("sonarSensor", &sonar_msg);
 int16_t range_values[SONAR_NUM];
+
 
 void ledControl(const std_msgs::Int16MultiArray& msg) {  
   if (msg.data_length >= LED_NUM) {
@@ -129,20 +145,48 @@ void handleCylinders() {
   }
 }
 
+void handleBattery() {
+  unsigned long currentMillis = millis();
+  if (currentMillis - lastBatteryTime >= batteryInterval) {
+    lastBatteryTime = currentMillis;
+
+    float busVoltage = ina219.getBusVoltage_V();
+  
+    float batteryPercent = mapFloat(busVoltage, 20.0, 29.2, 0, 100); 
+
+    if (batteryPercent > 100) batteryPercent = 100;
+    if (batteryPercent < 0) batteryPercent = 0;
+
+    battery_data[0] = busVoltage;
+    battery_data[1] = batteryPercent;
+    
+    pub_battery.publish(&battery_msg);
+  }
+}  
 void setup() {
   SpioInstance.init();
+  
   nh.initNode();
   nh.advertise(pub_sonar);
+  nh.advertise(pub_battery); 
   nh.subscribe(sub_led);
   nh.subscribe(sub_cylinder);
 
   sonar_msg.data_length = SONAR_NUM;
   sonar_msg.data = range_values;
+  
+  battery_msg.data_length = 2;
+  battery_msg.data = battery_data;
+
+  if (!ina219.begin()) {
+
+  }
 }
 
 void loop() {
   SpioInstance.onLoop();
   handleCylinders();     
+  handleBattery();
 
   for (int i = 0; i < SONAR_NUM; i++) {
     range_values[i] = (int16_t)sonars[i].ping_cm();
