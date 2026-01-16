@@ -171,7 +171,9 @@ class RobotMonitor:
         self.led_states = msg.data
         
     def battery_cb(self, msg):
-        self.battery_data = msg.data
+        if len(msg.data) >= 2:
+            self.battery_data = msg.data
+            
 if __name__ == '__main__':
     robot = RobotMonitor()
     rate = rospy.Rate(10) 
@@ -189,10 +191,12 @@ if __name__ == '__main__':
                 f"Batt: {voltage:.2f}V ({percent:.1f}%) | "
                 f"Sonar: {list(robot.sonar_data)} | "
                 f"Doors: {list(robot.door_states)} | "
-                f"LEDs: {led_display}   "
+                f"LEDs: {led_display}   "                       
             )
             
             sys.stdout.flush()
             rate.sleep()
+    except rospy.ROSInterruptException:
+        pass
     except Exception as e:
-        print(e)
+        print(f"\nError: {e}")
